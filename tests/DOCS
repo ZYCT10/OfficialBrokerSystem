@@ -1,0 +1,36 @@
+READY TO DEPLOYMENT CODE:
+
+1. binance_gws.py
+Test availability of binance api gateways.
+It could be useful if api gateway /api/ on binance dies and we need to fix it fastly.
+To fix it fastly you can change /api/ gateway on other (/api1/ ...etc...)
+
+2. endpoint_requests.py
+Test connection to usual user (NOT CORPORATIVE) account.
+Feel free to use my credentials on the prod, but if you need to login on account you have to ask me.
+It could be useful to know if there is possible problems on the Binance side with API
+
+3. time_difference.py
+Test time sync with PC and Binance servers.
+If there is time difference between Binance and our environment more than 5000 ms then there would be
+some problems with signing our requests. If that test fails you need to check that environment time
+synced with internet
+
+4. hmac256.py
+Test calculation of HMAC SHA256 inside Python 3.
+It could be useful if Python 3 change something in system package in future
+
+5. generate_random.py
+Test calculation of random string inside Python 3
+
+6. smart_symbols.py
+Test if we have smart symbols
+
+7. release.py
+Test requests to Docker instance
+
+8. release_test.py
+Launch release.py
+
+9. build_test.py
+Launch 1-6 tests
