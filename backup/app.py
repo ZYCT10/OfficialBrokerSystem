@@ -1,3 +1,20 @@
+#
+# Main entry point to the backend module.
+# This module provides Binance api calls and cryptocurrency exchange.
+#
+# Example running:
+# flask run -p 6125
+#
+# TODO: Need to listen on routes and pass only verified calls.
+# TODO: Need to verify calls (they should at least contain real user id)
+#
+# On this side we also need:
+# TODO: Catch 418's from Binance and immediately warn about it in some way
+# TODO: Catch 403's from Binance and warn about it in some way.
+# TODO: Contain requests to Binance in some kind of queue
+# TODO: Catch 429's from Binance and jump on other API-KEY.
+# TODO: Also we can accumulate requests weight and move requests to queue.
+
 import os
 import time
 from random import choices
@@ -22,8 +39,11 @@ app = Flask(__name__)
 binance_client = Client(BROKER_API_KEY, BROKER_API_SECRET)
 
 raw_cryptopairs = binance_client.get_all_tickers()
-cryptopairs = [crypto_currency["symbol"] for crypto_currency in raw_cryptopairs]
+cryptopairs = [e["symbol"] for e in raw_cryptopairs]
 
+#   Routes in Flask - special kind of the functions that
+##  listen calls to URI's on the server. They can get
+### request params and call another object code.
 
 # Test route
 @app.route("/")
@@ -67,6 +87,74 @@ def create_subaccount():
         return jsonify({500: str(e)})
 
 
+# Create assets
+@app.route("/createAssets")
+def create_assets():
+    get_on_id = request.args.get("on_id")
+
+    # (1) -> Sub Future
+    try:
+        binance_client.make_subaccount_universal_transfer(
+            toId=get_on_id,
+            fromAccountType="SPOT",
+            toAccountType="USDT_FUTURE",
+            asset="USDT",
+            amount=2
+        )
+
+    except Exception as e:
+        return jsonify({500: "Error Master SPOT -> Sub Future: {}".format(str(e))})
+
+    time.sleep(1.3)
+
+    # (2) Sub Future -> Sub SPOT
+    try:
+        binance_client.make_subaccount_universal_transfer(
+            fromId=get_on_id,
+            toId=get_on_id,
+            fromAccountType="USDT_FUTURE",
+            toAccountType="SPOT",
+            asset="USDT",
+            amount=2
+        )
+
+    except Exception as e:
+        return jsonify({500: "Error Sub Future -> Sub SPOT: {}".format(str(e))})
+
+    time.sleep(0.8)
+
+    # (3) Sub SPOT -> Sub Future
+    try:
+        binance_client.make_subaccount_universal_transfer(
+            fromId=get_on_id,
+            toId=get_on_id,
+            fromAccountType="SPOT",
+            toAccountType="USDT_FUTURE",
+            asset="USDT",
+            amount=2
+        )
+        
+    except Exception as e:
+        return jsonify({500: "Error Sub SPOT -> Sub Future: {}".format(str(e))})
+
+    time.sleep(1.3)
+
+    # (4) Sub Future -> Master SPOT
+    try:
+        binance_client.make_subaccount_universal_transfer(
+            fromId=get_on_id,
+            fromAccountType="USDT_FUTURE",
+            toAccountType="SPOT",
+            asset="USDT",
+            amount=2
+        )
+        
+        return jsonify({200: "Created"})
+
+    except Exception as e:
+        return jsonify({500: "Error Sub Future -> Master SPOT: {}".format(str(e))})
+
+
 # Get subaccount list
 @app.route("/getSubaccountList")
 def get_subaccounts():
@@ -93,7 +181,11 @@ def get_subacc_assets():
         return jsonify({500: str(e)})
 
 
-# Get a currency pair rate
+# Get currency. In original library this method gets all cryptocurrencies
+# and get needed one from JSON.
+# This method would be called very often so we can call it periodically in
+# other place and contain cryptocurrincies in Redis, so we don't need to
+# make a real calls to Binance api's.
 @app.route("/getCurrency", methods=["GET"])
 def get_currency():
     get_symbol = request.args.get("symbol")
@@ -107,7 +199,6 @@ def get_currency():
         return jsonify({500: str(e)})
 
 
-# Get the rate of all currency pairs
 @app.route("/getCurrencies", methods=["GET"])
 def get_currencies():
     try:
@@ -117,9 +208,8 @@ def get_currencies():
 
     except Exception as e:
         return jsonify({500: str(e)})
+ 
 
-
-# Get reverse rate of currency pairs (Symbol)
 @app.route("/getReverseCurrency", methods=["GET"])
 def get_reverse_currency():
     get_symbol = request.args.get("symbol")
@@ -253,20 +343,20 @@ def new_order():
         return jsonify({500: str(e)})
 
 
-@app.route("/subMasterOrder", methods=["GET"])
+# Transfer from Sub, order on Master, and transfer back
+@app.route("/subMasterOrder")
 def sub_master_order():
-    try:
+    try: 
         get_have = request.args.get("have")
         get_need = request.args.get("need")
         get_quantity = request.args.get("quantity")
         get_from_id = request.args.get("from_id")
-
-        get_old_quantity = get_quantity
-
+        futures_type = "COIN_FUTURE"
+  
         if get_have + get_need in cryptopairs:
             pair = get_have + get_need
             get_side = "SELL"
-            
+        
         elif get_need + get_have in cryptopairs:
             pair = get_need + get_have
             get_side = "BUY"
@@ -276,25 +366,45 @@ def sub_master_order():
 
         get_quantity = float(get_quantity)
 
+        if get_have == "USDT": # Change futures type in case of USDT
+            futures_type = "USDT_FUTURE"
+        
         if get_side != "BUY" and get_side != "SELL":
             return jsonify({500: "side can be one of: [BUY, SELL]"})
 
     except Exception as e:
         return jsonify({500: "Server error: {}".format(str(e))})
 
-    # (2) Sub SPOT -> Master SPOT
+    # (1) Sub SPOT -> Sub Future
     try:
-        binance_client.make_subaccount_universal_transfer(
+        print(get_from_id)
+        res = binance_client.make_subaccount_universal_transfer(
             fromId=get_from_id,
+            toId=get_from_id,
             fromAccountType="SPOT",
-            toAccountType="SPOT",
+            toAccountType=futures_type,
             asset=get_have,
-            amount=get_old_quantity
+            amount=get_quantity
         )
 
     except Exception as e:
-        return jsonify({500: "Error Sub SPOT -> Master SPOT: {}".format(str(e))})
-    
+        return jsonify({500: "Error Sub SPOT -> Sub Future: {}".format(str(e))})
+
+    time.sleep(1.3)
+
+    # (2) Sub Future -> Master SPOT
+    try:
+        res = binance_client.make_subaccount_universal_transfer(
+            fromId=get_from_id,
+            fromAccountType=futures_type,
+            toAccountType="SPOT",
+            asset=get_have,
+            amount=get_quantity
+        )
+
+    except Exception as e:
+        return jsonify({500: "Error Sub Future -> Master SPOT: {}".format(str(e))})
+
     time.sleep(1)
 
     # *(2.5) Get symbol ticker
@@ -306,21 +416,7 @@ def sub_master_order():
             get_quantity = "{:.2f}".format(0.97 * (get_quantity * get_currency))
 
         except Exception as e:
-            try:
-                binance_client.make_subaccount_universal_transfer(
-                    toId=get_from_id,
-                    fromAccountType="SPOT",
-                    toAccountType="SPOT",
-                    asset=get_have,
-                    amount=get_old_quantity
-                )
-
-            except Exception as e:
-                return jsonify({500: "Double error: {}".format(str(e))})
-            
             return jsonify({500: "Error getting currency from Binance: {}".format(str(e))})
-    
-    time.sleep(1)
 
     # (3) Order on master account
     try:
@@ -332,34 +428,42 @@ def sub_master_order():
         )
 
         summary = res
-        
-        if get_side == "SELL":
-            get_need_amount = summary["cummulativeQuoteQty"]
-        else:
-            get_need_amount = summary["executedQty"]
+        get_need_amount = summary["executedQty"]
 
     except Exception as e:
-        try:
-            binance_client.make_subaccount_universal_transfer(
-                toId=get_from_id,
-                fromAccountType="SPOT",
-                toAccountType="SPOT",
-                asset=get_have,
-                amount=get_old_quantity
-            )
-
-        except Exception as e:
-            return jsonify({500: "Double error: {}".format(str(e))})
-    
         return jsonify({500: "Error in order: {}".format(str(e))})
 
-    time.sleep(1.3)
+    time.sleep(1.5)
 
-    # (5) Master SPOT -> Sub SPOT
+    # (4) -> Sub Future
+    # Change futures type on runtime if needed
+    if get_need == "USDT": # Change futures type in case of USDT
+        futures_type = "USDT_FUTURE"
+        
+    # Change amount to transfer on runtime
+    if get_side == "SELL":
+        get_need_amount = get_quantity
+
     try:
         res = binance_client.make_subaccount_universal_transfer(
             toId=get_from_id,
             fromAccountType="SPOT",
+            toAccountType=futures_type,
+            asset=get_need,
+            amount=get_need_amount
+        )
+
+    except Exception as e:
+        return jsonify({500: "Error Master SPOT -> Sub Future {}".format(str(e))})
+
+    time.sleep(1.3)
+
+    # (5) Sub Future -> Sub SPOT
+    try:
+        res = binance_client.make_subaccount_universal_transfer(
+            fromId=get_from_id,
+            toId=get_from_id,
+            fromAccountType=futures_type,
             toAccountType="SPOT",
             asset=get_need,
             amount=get_need_amount
@@ -368,19 +472,7 @@ def sub_master_order():
         return jsonify({200: summary})
 
     except Exception as e:
-        try:
-            binance_client.make_subaccount_universal_transfer(
-                toId=get_from_id,
-                fromAccountType="SPOT",
-                toAccountType="SPOT",
-                asset=get_need,
-                amount=get_need_amount
-            )
-
-        except Exception as e:
-            return jsonify({500: "Double error: {}".format(str(e))})
-
-        return jsonify({500: "Error Master SPOT -> Sub SPOT {}".format(str(e))})
+        return jsonify({500: "Error Sub Future -> Sub SPOT {}".format(str(e))})
 
 
 # Withdraw outside (BSC)
@@ -405,23 +497,23 @@ def withdraw():
         return jsonify({500: str(e)})
 
 
-# Get the entire list of networks
-@app.route("/wholeNetworkList")
-def whole_network_list():
-    res = binance_client.get_margin_all_pairs()
-    res = sorted(set([el["base"] for el in res]))
+@app.route("/allPairs")
+def all_pairs():
+    try:
+        res = binance_client.get_margin_all_pairs()
+        res = sorted(set([el["base"] for el in res]))
 
-    return jsonify({200: res})
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
 
 
-# Get a list of available networks
-@app.route("/allNetworks")
+@app.route("/allNetworks", methods=["GET"])
 def all_networks():
     arr = ["BNB", "ETH", "TRX", "BTC"]
-
     return jsonify({200: arr})
 
 
-# Program entry point
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=12000, debug=True)
+    app.run(host="0.0.0.0", port=80, debug=True)
