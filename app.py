@@ -423,6 +423,33 @@ def withdraw():
         return jsonify({500: str(e)})
 
 
+# Get a rate for a pair of currencies (safe)
+@app.route("/getSafeRateCurrencyPair")
+def get_safe_rate_currency_pair():
+    get_one = request.args.get("one")
+    get_second = request.args.get("second")
+
+    try:
+        if get_one + get_second in cryptopairs:
+            pair = get_one + get_second
+            res = binance_client.get_symbol_ticker(symbol=pair)
+
+            return jsonify({200: str(res)})
+    
+        elif get_second + get_one in cryptopairs:
+            pair = get_second + get_one
+            res = binance_client.get_symbol_ticker(symbol=pair)
+        
+            return jsonify({200: str(res)})
+        
+        else:
+            return jsonify({500: "Not found!"})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+            
+        
+
 # Get the entire list of networks
 @app.route("/wholeNetworkList")
 def whole_network_list():
