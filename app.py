@@ -9,8 +9,8 @@ from flask import Flask, request, jsonify
 #BROKER_API_KEY = os.environ.get("BROKER_API_KEY")
 #BROKER_API_SECRET = os.environ.get("BROKER_API_SECRET")
 
-BROKER_API_KEY = "4FvCCc2h8H2TlNKXrpddZRAkB9qRVIlbDIOBZ3D9k9IWwbgt8NhQpp83spQ5E6Ml"
-BROKER_API_SECRET = "KZRdux9jA4q3VE43ePkhmx63kdFSn04IS0FEKbIDggZlaRyC0fVuFPCd0nv1Hii8"
+BROKER_API_KEY = os.getenv("BROKER_API_KEY")
+BROKER_API_SECRET = os.getenv("BROKER_API_SECRET")
 
 # Generate Binance tag
 def random_letters(length):
@@ -57,6 +57,24 @@ def create_subaccount():
 
             res = binance_client.enable_subaccount_futures(subAccountId=get_subaccount_id, futures="true")
             summary.update(res)
+
+            binance_client.make_subaccount_universal_transfer(
+                toId=get_subaccount_id,
+                fromAccountType="SPOT",
+                toAccountType="SPOT",
+                asset="USDT",
+                amount=2
+            )
+
+            time.sleep(2)
+
+            binance_client.make_subaccount_universal_transfer(
+                fromId=get_subaccount_id,
+                fromAccountType="SPOT",
+                toAccountType="SPOT",
+                asset="USDT",
+                amount=2
+            )
 
         else:
             return jsonify({500: str(res)})
