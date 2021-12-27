@@ -137,23 +137,6 @@ def get_currencies():
         return jsonify({500: str(e)})
 
 
-# Get reverse rate of currency pairs (Symbol)
-@app.route("/getReverseCurrency", methods=["GET"])
-def get_reverse_currency():
-    get_symbol = request.args.get("symbol")
-
-    try:
-        res = binance_client.get_symbol_ticker(symbol=get_symbol)
-        summary = res
-        reverse_currency = "{:.16f}".format(1.0 / float(res['price']))
-        summary['price'] = reverse_currency
-
-        return jsonify({200: summary})
-
-    except Exception as e:
-        return jsonify({500: str(e)})
-
-
 # Get subaccount deposit address (need to check if we can simply use it for input money transfer)
 @app.route("/getSubaccountDepositAddress", methods=["GET"])
 def get_subaccount_deposit_address():
@@ -426,29 +409,54 @@ def withdraw():
 # Get a rate for a pair of currencies (safe)
 @app.route("/getSafeRateCurrencyPair")
 def get_safe_rate_currency_pair():
-    get_one = request.args.get("one")
+    get_first = request.args.get("first")
     get_second = request.args.get("second")
 
     try:
-        if get_one + get_second in cryptopairs:
-            pair = get_one + get_second
+        if get_first + get_second in cryptopairs:
+            pair = get_first + get_second
             res = binance_client.get_symbol_ticker(symbol=pair)
 
-            return jsonify({200: str(res)})
-    
-        elif get_second + get_one in cryptopairs:
-            pair = get_second + get_one
+        elif get_second + get_first in cryptopairs:
+            pair = get_second + get_first
             res = binance_client.get_symbol_ticker(symbol=pair)
-        
-            return jsonify({200: str(res)})
         
         else:
             return jsonify({500: "Not found!"})
 
+        return jsonify({200: str(res)})
+        
     except Exception as e:
         return jsonify({500: str(e)})
-            
+
+
+# Get reverse rate of currency pairs (safe)
+@app.route("/getSafeRateReverseCurrencyPair", methods=["GET"])
+def get_reverse_currency():
+    get_first = request.args.get("first")
+    get_second = request.args.get("second")
+
+    try:
+        if get_first + get_second in cryptopairs:
+            pair = get_first + get_second
+            res = binance_client.get_symbol_ticker(symbol=pair)
+
+        elif get_second + get_first in cryptopairs:
+            pair = get_second + get_first
+            res = binance_client.get_symbol_ticker(symbol=pair)
+     
+        else:
+            return jsonify({500: "Not found!"})
+
+        summary = res
+        reverse_currency = "{:.16f}".format(1.0 / float(res['price']))
+        summary['price'] = reverse_currency
         
+        return jsonify({200: str(summary)})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
 
 # Get the entire list of networks
 @app.route("/wholeNetworkList")
