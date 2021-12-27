@@ -424,7 +424,7 @@ def get_safe_rate_currency_pair():
         else:
             return jsonify({500: "Not found!"})
 
-        return jsonify({200: str(res)})
+        return jsonify({200: res})
         
     except Exception as e:
         return jsonify({500: str(e)})
@@ -452,7 +452,7 @@ def get_reverse_currency():
         reverse_currency = "{:.16f}".format(1.0 / float(res['price']))
         summary['price'] = reverse_currency
         
-        return jsonify({200: str(summary)})
+        return jsonify({200: summary})
 
     except Exception as e:
         return jsonify({500: str(e)})
