@@ -4,7 +4,7 @@ from random import choices
 from string import ascii_lowercase
 
 from binance.client import Client
-from flask import Flask, request, jsonify
+from flask import Flask, json, request, jsonify
 
 #BROKER_API_KEY = os.environ.get("BROKER_API_KEY")
 #BROKER_API_SECRET = os.environ.get("BROKER_API_SECRET")
@@ -461,19 +461,38 @@ def get_reverse_currency():
 # Get the entire list of networks
 @app.route("/wholeNetworkList")
 def whole_network_list():
-    res = binance_client.get_margin_all_pairs()
-    res = sorted(set([el["base"] for el in res]))
+    try:
+        res = binance_client.get_margin_all_pairs()
+        res = sorted(set([el["base"] for el in res]))
 
-    return jsonify({200: res})
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
 
 
 # Get a list of available networks
 @app.route("/allNetworks")
 def all_networks():
-    arr = ["BNB", "ETH", "TRX", "BTC"]
+    try:
+        arr = ["BSC", "ETH", "TRX", "BTC"]
 
-    return jsonify({200: arr})
+        return jsonify({200: arr})
 
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Get all coin list with networks
+@app.route("/getAllCoinsInformation")
+def get_subaccount_transfer_history():
+    try:
+        res = binance_client.get_all_coins_info()
+
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
 
 # Program entry point
 if __name__ == "__main__":
