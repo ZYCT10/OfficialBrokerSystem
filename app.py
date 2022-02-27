@@ -1,10 +1,11 @@
 import os
 import time
+import json
 from random import choices
 from string import ascii_lowercase
 
 from binance.client import Client
-from flask import Flask, json, request, jsonify
+from flask import Flask, request, jsonify
 
 #BROKER_API_KEY = os.environ.get("BROKER_API_KEY")
 #BROKER_API_SECRET = os.environ.get("BROKER_API_SECRET")
@@ -458,6 +459,33 @@ def get_reverse_currency():
         return jsonify({500: str(e)})
 
 
+# Get a rate currency (Buy/Sell)
+@app.route("/rate")
+def get_rate():
+    get_from = request.args.get("from")
+    get_to = request.args.get("to")
+
+    try:
+        if get_from + get_to in cryptopairs:
+            pair = get_from + get_to
+            res = binance_client.get_symbol_ticker(symbol=pair)
+
+        elif get_to + get_from in cryptopairs:
+            pair = get_to + get_from
+            res = binance_client.get_symbol_ticker(symbol=pair)
+
+            rev_curency = "{:.16f}".format(1.0 / float(res['price']))
+            res['price'] = rev_curency
+
+        else:
+            return jsonify({500: "Not found!"})
+    
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
 # Get the entire list of networks
 @app.route("/wholeNetworkList")
 def whole_network_list():
@@ -493,6 +521,57 @@ def get_subaccount_transfer_history():
 
     except Exception as e:
         return jsonify({500: str(e)})
+
+
+@app.route("/getHistory", methods=["GET"])
+def get_history():
+    get_fromEmail = request.args.get('fromEmail')
+    get_toEmail = request.args.get('toEmail')
+    get_startTime = request.args.get('startTime')
+    get_endTime = request.args.get('endTime')
+    get_page = request.args.get("page")
+    get_limit = request.args.get("limit")
+    
+    try:
+        res = binance_client.get_sub_account_transfer_history(
+              
+        )
+        
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+@app.route("/getNetworksAddress", methods=["GET"])
+def get_networks_address():
+    get_coin = request.args.get("coin")
+    get_email = request.args.get("email")
+
+    try:
+        res = []
+
+        get_all_info = binance_client.get_all_coins_info()
+
+        get_networks = [x for x in get_all_info if x["coin"] == get_coin]
+
+        for get_network in get_networks[0]["networkList"]:
+
+            get_result = binance_client.get_subaccount_deposit_address(
+                email=get_email,
+                coin="BTC",
+                network=get_network["network"]
+            )
+
+            get_result["network"] = get_network["network"]
+            
+            res.append(get_result)
+
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
 
 # Program entry point
 if __name__ == "__main__":
