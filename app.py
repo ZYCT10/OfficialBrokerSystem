@@ -556,16 +556,18 @@ def get_networks_address():
         get_networks = [x for x in get_all_info if x["coin"] == get_coin]
 
         for get_network in get_networks[0]["networkList"]:
+            try:
+                get_result = binance_client.get_subaccount_deposit_address(
+                    email=get_email,
+                    coin=get_coin,
+                    network=get_network["network"]
+                )
 
-            get_result = binance_client.get_subaccount_deposit_address(
-                email=get_email,
-                coin="BTC",
-                network=get_network["network"]
-            )
-
-            get_result["network"] = get_network["network"]
+                get_result["network"] = get_network["network"]
             
-            res.append(get_result)
+                res.append(get_result)
+            except:
+                pass
 
         return jsonify({200: res})
 
