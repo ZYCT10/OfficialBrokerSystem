@@ -1,14 +1,11 @@
+from crypt import methods
 import os
 import time
-import json
 from random import choices
 from string import ascii_lowercase
 
 from binance.client import Client
 from flask import Flask, request, jsonify
-
-#BROKER_API_KEY = os.environ.get("BROKER_API_KEY")
-#BROKER_API_SECRET = os.environ.get("BROKER_API_SECRET")
 
 BROKER_API_KEY = os.getenv("BROKER_API_KEY")
 BROKER_API_SECRET = os.getenv("BROKER_API_SECRET")
@@ -388,20 +385,67 @@ def sub_master_order():
 # Withdraw outside (BSC)
 @app.route("/withdraw", methods=["GET"])
 def withdraw():
-    coin = request.args.get("coin")
-    network = request.args.get("network")
-    address = request.args.get("address")
-    amount = request.args.get("amount")
+    get_coin = request.args.get("coin")
+    get_network = request.args.get("network")
+    get_address = request.args.get("address")
+    get_amount = request.args.get("amount")
 
     try:
         res = binance_client.withdraw(
-            coin=coin,
-            network=network,
-            address=address,
-            amount=float(amount)
+            coin=get_coin,
+            network=get_network,
+            address=get_address,
+            amount=float(get_amount)
         )
 
         return jsonify({200: res})
+    
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Withdraw from subaccount to deposit address
+@app.route("/withdrawFromSubToDeposit", methods=["GET"])
+def withdraw_from_sub_to_deposit():
+    get_coin = request.args.get("coin")
+    get_id = request.args.get("id")
+    get_network = request.args.get("network")
+    get_address = request.args.get("address")
+    get_amount = request.args.get("amount")
+
+    try:
+        res = binance_client.make_subaccount_universal_transfer(
+            fromId=get_id,
+            fromAccountType="SPOT",
+            toAccountType="SPOT",
+            asset=get_coin,
+            amount=get_amount
+        )
+
+        try:
+            time.sleep(2)
+            
+            res = binance_client.withdraw(
+                coin=get_coin,
+                network=get_network,
+                address=get_address,
+                amount=float(get_amount)
+            )
+
+            return jsonify({200: res})
+
+        except Exception as e:
+            time.sleep(2)
+
+            res = binance_client.make_subaccount_universal_transfer(
+                toId=get_id,
+                fromAccountType="SPOT",
+                toAccountType="SPOT",
+                asset=get_coin,
+                amount=get_amount
+            )
+
+            return jsonify({500: str(e)})
     
     except Exception as e:
         return jsonify({500: str(e)})
@@ -523,18 +567,55 @@ def get_subaccount_transfer_history():
         return jsonify({500: str(e)})
 
 
-@app.route("/getHistory", methods=["GET"])
-def get_history():
-    get_fromEmail = request.args.get('fromEmail')
-    get_toEmail = request.args.get('toEmail')
-    get_startTime = request.args.get('startTime')
-    get_endTime = request.args.get('endTime')
-    get_page = request.args.get("page")
+# Get deposit history
+@app.route("/getDepositHistory", methods=["GET"])
+def get_deposit_history():
+    get_email = request.args.get("email")
+    get_coin = request.args.get("coin")
+    get_status = request.args.get("status")
+    get_start_time = request.args.get("startTime")
+    get_end_time = request.args.get("endTime")
     get_limit = request.args.get("limit")
-    
+    get_offset = request.args.get("offset")
+
     try:
-        res = binance_client.get_sub_account_transfer_history(
-              
+        res = binance_client.get_subaccount_deposit_history(
+              email=get_email,
+              coin=get_coin,
+              status=get_status,
+              startTime=get_start_time,
+              endTime=get_end_time,
+              limit=get_limit,
+              offset=get_offset
+        )
+        
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Get Withdraw History
+@app.route("/getWithdrawHistory", methods=["GET"])
+def get_withdraw_history():
+    
+    get_coin = request.args.get("coin")
+    get_withdraw_order_id = request.args.get("withdrawOrderId")
+    get_status = request.args.get("status")
+    get_offset = request.args.get("offset")
+    get_limit = request.args.get("limit")
+    get_start_time = request.args.get("startTime")
+    get_end_time = request.args.get("endTime")
+
+    try:
+        res = binance_client.get_withdraw_history(
+            coin=get_coin,
+            withdrawOrderId=get_withdraw_order_id,
+            status=get_status,
+            offset=get_offset,
+            limit=get_limit,
+            startTime=get_start_time,
+            endTime=get_end_time
         )
         
         return jsonify({200: res})
@@ -568,6 +649,22 @@ def get_networks_address():
                 res.append(get_result)
             except:
                 pass
+
+        return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Get subaccount deposit history
+@app.route("/getSubaccountDepositHistory", methods=["GET"])
+def get_subaccount_deposit_history():
+    get_email = request.args.get("email")
+
+    try:
+        res = binance_client.get_subaccount_deposit_history(
+            email=get_email
+        )
 
         return jsonify({200: res})
 
