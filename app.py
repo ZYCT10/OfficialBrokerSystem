@@ -7,8 +7,12 @@ from string import ascii_lowercase
 from binance.client import Client
 from flask import Flask, request, jsonify
 
+# Broker client data
 BROKER_API_KEY = os.getenv("BROKER_API_KEY")
 BROKER_API_SECRET = os.getenv("BROKER_API_SECRET")
+
+# Token for (some operations)
+SECURITY_TOKEN = os.getenv("SECURITY_TOKEN")
 
 # Generate Binance tag
 def random_letters(length):
@@ -21,7 +25,6 @@ binance_client = Client(BROKER_API_KEY, BROKER_API_SECRET)
 
 raw_cryptopairs = binance_client.get_all_tickers()
 cryptopairs = [crypto_currency["symbol"] for crypto_currency in raw_cryptopairs]
-
 
 # Test route
 @app.route("/")
@@ -389,6 +392,10 @@ def withdraw():
     get_network = request.args.get("network")
     get_address = request.args.get("address")
     get_amount = request.args.get("amount")
+    get_security_token = request.args.get("token")
+
+    if (get_security_token == None) or (get_security_token != SECURITY_TOKEN):
+        return jsonify({500: "Invalid token"})
 
     try:
         res = binance_client.withdraw(
