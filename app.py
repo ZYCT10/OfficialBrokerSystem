@@ -1,6 +1,7 @@
 from crypt import methods
 import os
 import time
+import logging
 from random import choices
 from string import ascii_lowercase
 
@@ -22,6 +23,8 @@ def random_letters(length):
 # Need to create this objects only one time
 app = Flask(__name__)
 binance_client = Client(BROKER_API_KEY, BROKER_API_SECRET)
+
+logging.basicConfig(filename='log.txt', level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s")
 
 raw_cryptopairs = binance_client.get_all_tickers()
 cryptopairs = [crypto_currency["symbol"] for crypto_currency in raw_cryptopairs]
@@ -45,7 +48,7 @@ def get_account():
 
 
 # Create subaccount, enable futures.
-@app.route("/createSubaccount")
+@app.route("/createSubaccount", methods=["GET"])
 def create_subaccount():
     try:
         res = binance_client.create_broker_sub_account(tag=random_letters(12))
@@ -87,7 +90,7 @@ def create_subaccount():
 
 
 # Get subaccount list
-@app.route("/getSubaccountList")
+@app.route("/getSubaccountList", methods=["GET"])
 def get_subaccounts():
     try:
         res = binance_client.get_sub_account_list()
@@ -255,6 +258,7 @@ def new_order():
         return jsonify({500: str(e)})
 
 
+# Exchange Currency
 @app.route("/subMasterOrder", methods=["GET"])
 def sub_master_order():
     try:
@@ -459,7 +463,7 @@ def withdraw_from_sub_to_deposit():
 
 
 # Get a rate for a pair of currencies (safe)
-@app.route("/getSafeRateCurrencyPair")
+@app.route("/getSafeRateCurrencyPair", methods=["GET"])
 def get_safe_rate_currency_pair():
     get_first = request.args.get("first")
     get_second = request.args.get("second")
@@ -511,7 +515,7 @@ def get_reverse_currency():
 
 
 # Get a rate currency (Buy/Sell)
-@app.route("/rate")
+@app.route("/rate", methods=["GET"])
 def get_rate():
     get_from = request.args.get("from")
     get_to = request.args.get("to")
@@ -538,7 +542,7 @@ def get_rate():
 
 
 # Get the entire list of networks
-@app.route("/wholeNetworkList")
+@app.route("/wholeNetworkList", methods=["GET"])
 def whole_network_list():
     try:
         res = binance_client.get_margin_all_pairs()
@@ -551,7 +555,7 @@ def whole_network_list():
 
 
 # Get a list of available networks
-@app.route("/allNetworks")
+@app.route("/allNetworks", methods=["GET"])
 def all_networks():
     try:
         arr = ["BSC", "ETH", "TRX", "BTC"]
@@ -563,12 +567,25 @@ def all_networks():
 
 
 # Get all coin list with networks
-@app.route("/getAllCoinsInformation")
+@app.route("/getAllCoinsInformation", methods=["GET"])
 def get_subaccount_transfer_history():
     try:
         res = binance_client.get_all_coins_info()
 
         return jsonify({200: res})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Get all coins
+@app.route("/getAllCoins", methods=["GET"])
+def get_all_coins():
+    try:
+        res = binance_client.get_all_coins_info()
+        get_coins_set = {i["coin"] for i in res}
+
+        return jsonify({200: list(get_coins_set)})
 
     except Exception as e:
         return jsonify({500: str(e)})
@@ -631,6 +648,37 @@ def get_withdraw_history():
         return jsonify({500: str(e)})
 
 
+# Get subaccount transfer history
+@app.route("/getBrokerSubaccountTransferHistory", methods=["GET"])
+def get_broker_subaccount_transfer_history():
+    get_from_id = request.args.get("fromId")
+    get_to_id = request.args.get("toId")
+    get_client_tran_id = request.args.get("clientTranId")
+    get_show_all_status = request.args.get("showAllStatus")
+    get_start_time = request.args.get("startTime")
+    get_end_time = request.args.get("endTime")
+    get_page = request.args.get("page")
+    get_limit = request.args.get("limit")
+
+    try:
+        result = binance_client.query_subaccount_broker_transfer_history(
+            fromId=get_from_id,
+            toId=get_to_id,
+            clientTranId=get_client_tran_id,
+            showAllStatus=get_show_all_status,
+            startTime=get_start_time,
+            endTime=get_end_time,
+            page=get_page,
+            limit=get_limit
+        )
+
+        return jsonify({200: result})
+
+    except Exception as e:
+        return jsonify({500: str(e)})
+
+
+# Get Network Address
 @app.route("/getNetworksAddress", methods=["GET"])
 def get_networks_address():
     get_coin = request.args.get("coin")

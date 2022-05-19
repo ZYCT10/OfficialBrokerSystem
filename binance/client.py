@@ -2418,6 +2418,14 @@ class Client(BaseClient):
 
         """
         return self._request_margin_api('get', 'asset/transfer', signed=True, data=params)
+    
+
+    def query_subaccount_broker_transfer_history(self, **params):
+        """Query Subaccount Broker Transfer History
+            https://binance-docs.github.io/Brokerage-API/Brokerage_Operation_Endpoints/#query-sub-account-transfer-historyspot
+        """
+
+        return self._request_margin_api('get', 'broker/transfer', signed=True, data=params)
 
     def get_trade_fee(self, **params):
         """Get trade fee.
